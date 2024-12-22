@@ -6,7 +6,7 @@ This is the official repo for our in-progress work, “Token-Budget-Aware LLM Re
 
 Reasoning is crucial for LLMs to perform complex tasks, but methods like Chain-of-Thought (CoT) reasoning often lead to significant token overhead and increased costs. We identify substantial token redundancy in the reasoning process of state-of-the-art LLMs and propose a token-budget-aware reasoning framework. This approach dynamically allocates token budgets based on problem complexity to guide the reasoning process. Experiments demonstrate that our method reduces token usage in CoT reasoning with minimal performance trade-offs, striking a practical balance between efficiency and accuracy.
 
-<img src="images%20in%20text/image-20241222183014475.png" alt="image-20241222183014475" style="zoom: 50%;" />
+<img src="images%20in%20text/image-20241222191739762.png" alt="image-20241222191739762" style="zoom:50%;" />
 
 
 
