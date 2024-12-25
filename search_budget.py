@@ -36,7 +36,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def search_budget(instance, budget, model, evaluator, key='93e9a5ca979e4d5383c05326e1b42126'):
+def search_budget(instance, budget, model, evaluator, key='your_api_key'):
     pred_flag = evaluator.evaluate_sample(instance)
     upper_bound = budget
     pre_token_cost = upper_bound
