@@ -74,9 +74,9 @@ This project is in progress, and the following implementation is coming soon!
 
 ## 🤝Cite this work
 
-@article{han2024token,
-  title={Token-Budget-Aware LLM Reasoning},
-  author={Han, Tingxu and Wang, Zhenting and Fang, Chunrong and Zhao, Shiyu and Ma, Shiqing and Chen, Zhenyu},
-  journal={arXiv preprint arXiv:2412.18547},
-  year={2024}
+@article{han2024token,  
+  title={Token-Budget-Aware LLM Reasoning},  
+  author={Han, Tingxu and Wang, Zhenting and Fang, Chunrong and Zhao, Shiyu and Ma, Shiqing and Chen, Zhenyu},  
+  journal={arXiv preprint arXiv:2412.18547},  
+  year={2024}  
 }
