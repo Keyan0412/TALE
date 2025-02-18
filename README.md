@@ -70,7 +70,7 @@ python -u TALE-EP.py --data_name GSM8K-Zero --model gpt-4o-mini
 
 #### 📚 TALE-PT-SFT
 
-![image-20250216125709485](images%20in%20text/image-20250216125709485.png)
+<img src="images%20in%20text/image-20250216125709485.png" alt="image-20250216125709485" style="zoom: 67%;" />
 
 ```sh
 # for training
@@ -82,7 +82,7 @@ python -u TALE-PT.py --eval --strategy lora --model_name llama-3.1-8B-Instruct -
 
 #### 🔄TALE-PT-DPO
 
-![image-20250216125725621](images%20in%20text/image-20250216125725621.png)
+<img src="images%20in%20text/image-20250216125725621.png" alt="image-20250216125725621" style="zoom:67%;" />
 
 ```sh
 # for training
