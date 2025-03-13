@@ -23,7 +23,7 @@ proc_title = "your_proc_name"
 setproctitle.setproctitle(proc_title)
 MAX_LENGTH = MAX_NEW_Tokens = 512
 SEED = 1024
-TRAIN_EVAL_SPLIT = 0.8
+TRAIN_EVAL_SPLIT = 1.0
 EPOCH = 2
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
