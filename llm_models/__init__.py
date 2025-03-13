@@ -1,6 +1,5 @@
 from openai import OpenAI
 from google.api_core import retry
-import json
 import time
 import torch
 import requests
@@ -8,118 +7,71 @@ import google.generativeai as palm
 from tqdm import tqdm
 from utils import *
 import random
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from vllm import LLM, SamplingParams
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+import os
 
+os.environ["XFORMERS_FORCE_DISABLE_SDPA"] = "1"
 logger = logging.getLogger(__name__)
 
-API_BASE = "https://api.lingyiwanwu.com/v1"
+API_BASE = "The API BASE"
 palm_api_key = ''
 claude_api_key = ""
-max_tokens = 5000
-
-
-def inference_lora(sample_list, n_reasoning_paths, model, tokenizer, batch_size):
-    logger.info("Inference processing...")
-    pipe = pipeline("text-generation", model=model, tokenizer=tokenizer,
-                    torch_dtype=torch.float16,
-                    device_map="auto", batch_size=batch_size)
-    system_prompt = {"role": "system", "content": "You are a helpful assistant."}
-    messages = [[system_prompt, {"role": "user", "content": sample_list[i]}]
-                for i in range(len(sample_list))]
-
-    # logger.info(cur_sample[0]['prompt'])
-    output = []
-    for i in tqdm(range(0, len(sample_list), batch_size), desc="Processing", unit="batch"):
-        batch = messages[i:i + batch_size]
-        output.extend(pipe(batch,
-                           max_new_tokens=1024,
-                           temperature=0.1,
-                           repetition_penalty=1.2,
-                           do_sample=True,
-                           num_return_sequences=n_reasoning_paths))
-        logger.info(messages[i])
-        logger.info(output[i][0]['generated_text'][-1]['content'])
-        logger.info(f"Token costs is {token_measure(output[i][0]['generated_text'][-1]['content'])}")
-    assert len(output) == len(sample_list)
-    results = [output[i][0]['generated_text'][-1]['content'] for i in range(len(output))]
-    return results
+max_tokens = 1024
 
 
 class HuggingFaceModel:
     def __init__(self, args):
         self.args = args
         self.model_path = f'.cache/{self.args.model}'
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, torch_dtype=torch.float16,
-                                                       local_files_only=True)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_path, torch_dtype=torch.float16,
-                                                          local_files_only=True)
-        if args.model in ['Qwen2.5-14B', 'Qwen2.5-7B-Instruct-1M']:
-            self.tokenizer.padding_side = "left"
-            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.pad_token is None else self.tokenizer.pad_token
-        self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer,
-                             torch_dtype=torch.float16,
-                             device_map="auto", batch_size=self.args.batch_size)
+        # set inference params
+        self.llm = LLM(
+            model=self.model_path,
+            tokenizer=self.model_path,
+            max_model_len=2048,
+            gpu_memory_utilization=0.25,
+        )
         logger.info("Model loaded!")
 
-    def inference_batch(self, sample_list, n_reasoning_paths):
+    def inference(self, cur_sample, n_reasoning_paths):
+        sampling_params = SamplingParams(
+            temperature=0.1,
+            top_p=0.9,
+            max_tokens=max_tokens,
+            repetition_penalty=1.2,
+        )
         logger.info("Inference processing...")
-        system_prompt = {"role": "system", "content": "You are a helpful assistant."}
-        messages = [[system_prompt, {"role": "user", "content": sample_list[i]}] for i in range(len(sample_list))]
+        formatted_messages = [
+            f"You are a helpful assistant.\nUser: {cur_sample[0]['prompt']}\nAssistant:"
+        ]
+        outputs = self.llm.generate(formatted_messages, sampling_params)
+        n_input, n_output = [], []
+        return [outputs.outputs[0].text.strip()], n_input, n_output
 
-        # logger.info(cur_sample[0]['prompt'])
+    def inference_batch(self, sample_list, n_reasoning_paths):
+        sampling_params = SamplingParams(
+            temperature=0.1,
+            top_p=0.9,
+            max_tokens=max_tokens,
+            repetition_penalty=1.2,
+        )
+        logger.info("Inference processing...")
+        formatted_messages = [
+            f"You are a helpful assistant.\nUser: {sample}\nAssistant:" for sample in sample_list
+        ]
         results = []
+        logger.info(f"batch size: {self.args.batch_size}")
         for i in tqdm(range(0, len(sample_list), self.args.batch_size), desc="Processing", unit="batch"):
-            batch = messages[i:i + self.args.batch_size]
-            outputs = self.pipe(
-                batch, max_new_tokens=max_tokens,
-                temperature=0.1,
-                repetition_penalty=1.2,
-                do_sample=True,
-                num_return_sequences=n_reasoning_paths)
-            results.extend([output[0]['generated_text'][-1]['content'] for output in outputs])
-            logger.info(messages[i])
-            logger.info(results[-1])
+            batch = formatted_messages[i:i + self.args.batch_size]
+            outputs = self.llm.generate(batch, sampling_params)
+            batch_results = [output.outputs[0].text.strip() for output in outputs]
+            results.extend(batch_results)
+            # logger.info(batch[-1])
+            # logger.info(batch_results[-1])
+            del outputs
+            torch.cuda.empty_cache()
         assert len(results) == len(sample_list)
         # results = [output[i][0]['generated_text'][-1]['content'] for i in range(len(output))]
-        return results
-
-    def inference_batch_new(self, sample_list, n_reasoning_paths):
-        logger.info("Inference processing...")
-        system_prompt = {"role": "system", "content": "You are a helpful assistant."}
-        messages = [[system_prompt, {"role": "user", "content": sample}] for sample in sample_list]
-        tokenized_data = []
-        for message in messages:
-            formatted_message = self.format_message(message)
-            encoded_input = self.tokenizer(
-                formatted_message,
-                return_tensors="pt",
-                padding="max_length",
-                truncation=True,
-                max_length=512
-            )
-            tokenized_data.append(encoded_input)
-
-        results = []
-
-        for i in tqdm(range(0, len(messages), self.args.batch_size), desc="Processing Batches", unit="batch"):
-            batch = tokenized_data[i:i + self.args.batch_size]
-            batch_inputs = {k: torch.cat([b[k] for b in batch], dim=0).to("cuda") for k in batch[0].keys()}
-            with torch.no_grad():
-                output = self.model.generate(
-                    **batch_inputs,
-                    max_new_tokens=max_tokens,
-                    temperature=0.1,
-                    repetition_penalty=1.2,
-                    num_return_sequences=n_reasoning_paths,
-                    pad_token_id=self.tokenizer.eos_token_id
-                )
-            decoded_outputs = [self.tokenizer.decode(o, skip_special_tokens=True) for o in output]
-            results.extend(decoded_outputs)
-            logger.info(decoded_outputs)
-
-        assert len(results) == len(sample_list)
         return results
 
     @staticmethod
@@ -130,52 +82,6 @@ class HuggingFaceModel:
             content = msg["content"]
             formatted_message += f"{role}: {content}\n"
         return formatted_message.strip()
-
-    def inference(self, cur_sample, n_reasoning_paths):
-        logger.info("Inference processing...")
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": cur_sample[0]['prompt']},
-        ]
-        # logger.info(cur_sample[0]['prompt'])
-        output = self.pipe(
-            messages,
-            max_new_tokens=max_tokens,
-            temperature=0.1,
-            top_p=0.1,
-            repetition_penalty=1.2,
-            do_sample=True,
-            num_return_sequences=n_reasoning_paths
-        )
-
-        n_input, n_output = [], []
-        return [output[0]['generated_text'][-1]['content']], n_input, n_output
-
-
-def call_claude(prompt, model):
-    prompt = prompt.replace('\\n', '\n')
-    while True:
-        #    try:
-        data = {
-            "max_tokens_to_sample": max_tokens,
-            "model": model,
-            "prompt": prompt,
-            'temperature': 0,
-        }
-        response = requests.post(
-            url="https://api.anthropic.com/v1/complete",
-            headers={
-                'accept': 'application/json',
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-                'x-api-key': claude_api_key,
-            },
-            json=data,
-        )
-        if response.status_code == 200:
-            break
-    response = json.loads(response.text)["completion"]
-    return response
 
 
 def call_gpt(cur_sample, n_reasoning_paths,
@@ -248,30 +154,11 @@ def call_Yi_Lightning(cur_sample, n_reasoning_paths,
     return answers, n_input, n_output
 
 
-@retry.Retry()
-def call_palm(prompt, candidate_count, model):
-    completion = palm.generate_text(
-        model=model,
-        prompt=prompt,
-        temperature=0,
-        candidate_count=candidate_count,
-        max_output_tokens=512,
-    )
-    answers = [c['output'] for c in completion.candidates]
-    return answers
-
-
 class LLMModel:
     def __init__(self, args):
         self.local = False
         self.args = args
-        if "bison" in args.model:
-            palm.configure(api_key=palm_api_key)
-        if 'bison' in args.model:  # Google models
-            self.model = call_palm
-        elif 'claude' in args.model:
-            self.model = call_claude
-        elif 'gpt' in args.model or 'o3' in args.model:  # OpenAI models
+        if 'gpt' in args.model or 'o3' in args.model or 'o1' in args.model:  # OpenAI models
             self.model = call_gpt
         elif 'yi' in args.model:
             self.model = call_Yi_Lightning
@@ -291,4 +178,3 @@ class LLMModel:
         else:
             return self.model(sample, n_reasoning_paths=self.args.n,
                               api_key=key, model=self.args.model)
-
