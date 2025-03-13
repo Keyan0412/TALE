@@ -91,9 +91,3 @@ class GPQA(Dataset):
         return self.dataset[i]
 
 
-def test():
-    os.chdir(r'the path')
-    dataset = GPQA(1, with_reasoning=False, name=None, cache=True, budget=512)
-
-# test()
-

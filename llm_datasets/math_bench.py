@@ -121,13 +121,5 @@ class MathBenchDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, i):
-
         return self.dataset[i]
 
-
-def test():
-    os.chdir('..')
-
-    dataset = MathBenchDataset(1)
-
-# test()

@@ -87,10 +87,4 @@ class GSM8KZero(Dataset):
         return self.dataset[i]
 
 
-def test():
-    os.chdir('..')
-    dataset = GSM8KZero(1)
-
-# test()
-
 
