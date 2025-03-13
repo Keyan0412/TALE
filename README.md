@@ -21,13 +21,21 @@ We provide the implementation for Directly Answering and Vanilla CoT.
 ### ⚡Directly Answering
 
 ```sh
-python -u inference.py --data_name GSM8K-Zero --model gpt-4o-mini 
+# for gpt-4o-mini on GSM8K-Test
+python -u inference.py --data_name GSM8K-Test --model gpt-4o-mini 
+
+# for local model on GSM8K-Test
+python -u inference.py --model <local_model_name> --data_name GSM8K-Test --output_path <your_outdir> --batch_size 256
 ```
 
 ### 🔗Vanilla CoT
 
 ```sh
-python -u inference.py --data_name GSM8K-Zero --model gpt-4o-mini --reasoning
+# for gpt-4o-mini on GSM8K-Test
+python -u inference.py --data_name GSM8K-Test --model gpt-4o-mini --reasoning
+
+# for local model on GSM8K-Test
+python -u inference.py --model <local_model_name> --data_name GSM8K-Test --output_path <your_outdir> --batch_size 256 --reasoning
 ```
 
 
@@ -43,7 +51,7 @@ The output token costs between Directly Answering and Vanilla CoT are illustrate
 ## 🔍4. Search for optimal budget
 
 ```sh
-python -u search_budget.py --do_search --data_name GSM8K-Zero
+python -u search_budget.py --do_search --data_name GSM8K-Test
 ```
 
 #### 💰Output token costs
@@ -63,7 +71,7 @@ We provide two implementations of TALE, TALE-EP and TALE-PT.
 TALE with Zero-shot Estimator: 
 
 ```sh
-python -u TALE-EP.py --data_name GSM8K-Zero --model gpt-4o-mini
+python -u TALE-EP.py --data_name GSM8K-Test --model gpt-4o-mini
 ```
 
 ### 🎯TALE-PT
@@ -74,10 +82,10 @@ python -u TALE-EP.py --data_name GSM8K-Zero --model gpt-4o-mini
 
 ```sh
 # for training
-python -u TALE-PT.py --strategy lora --model_name llama-3.1-8B-Instruct --data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --strategy lora --model_name <your_model> --data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 
 # for eval
-python -u TALE-PT.py --eval --strategy lora --model_name llama-3.1-8B-Instruct --data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --eval --strategy lora --model_name <your_model> --data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 ```
 
 #### 🔄TALE-PT-DPO
@@ -86,10 +94,10 @@ python -u TALE-PT.py --eval --strategy lora --model_name llama-3.1-8B-Instruct -
 
 ```sh
 # for training
-python -u TALE-PT.py--strategy dpo --model_name llama-3.1-8B-Instruct --data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --strategy dpo --model_name <your_model> --data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 
 # for eval
-python -u TALE-PT.py --eval --strategy dpo --model_name llama-3.1-8B-Instruct --data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --eval --strategy dpo --model_name <your_model> --data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 ```
 
 
