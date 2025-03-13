@@ -1,5 +1,6 @@
 import logging
 import re
+from math_verify import parse, verify
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +30,26 @@ class AccEvaluator:
                 if index != -1:
                     prediction = text[index:]
                     break
+
         pattern = re.compile(r'[ABCD]')
         matches = pattern.findall(prediction)
         if matches:
-            answer = ''.join(matches)[-1]
+
+            answer = ''.join(matches)[-1]  
         else:
             answer = 'None'
+
         return answer
 
     @staticmethod
     def extract_predicted_answer(text):
+        pattern = r"\[\[(.*?)\]\]"
+
+        match = re.findall(pattern, text)
+
+        if match:
+            return match[-1]
+
         regex_pattern = "(-?[$0-9.,]{2,})|(-?[0-9]+)"
         regexes_to_ignore = [
             ",",
@@ -52,18 +63,19 @@ class AccEvaluator:
             if isinstance(match, tuple):
                 match = [m for m in match if m][0]
             text = match.strip()
-
             for regex in regexes_to_ignore:
                 text = re.sub(regex, "", text)
             return text
         else:
             return None
 
+    # @staticmethod
     def evaluate_sample(self, sample, cloze=True):
         gt = sample['ground truth']
         pred = sample['prediction']
         if cloze:
-            return gt == self.extract_predicted_answer(pred)
+            return (gt == self.extract_predicted_answer(pred)) or (f"[[{gt}]]" in pred) \
+                   or verify(parse(gt), parse(self.extract_predicted_answer(pred)))
         else:
             if f'[[{gt}]]' in pred:
                 return True
