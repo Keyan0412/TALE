@@ -451,7 +451,6 @@ def main():
             args.output_dir = os.path.join(args.output_dir, args.model_name, "DPO")
             evaluate_dpo()
     elif args.strategy == "lora":
-        # args.output_dir = f"./{args.output_dir}/{args.model_name}"
         args.output_dir = os.path.join(args.output_dir, args.model_name, "LoRA")
         if args.save:
             logger.info(f"Saving to {args.output_dir}")
