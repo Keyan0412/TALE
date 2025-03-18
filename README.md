@@ -82,10 +82,10 @@ python -u TALE-EP.py --data_name GSM8K-Test --model gpt-4o-mini
 
 ```sh
 # for training
-python -u TALE-PT.py --strategy lora --model_name <your_model> --data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --strategy lora --model_name <your_model> --train_data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 
 # for eval
-python -u TALE-PT.py --eval --strategy lora --model_name <your_model> --data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --eval --strategy lora --model_name <your_model> --test_data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 ```
 
 #### 🔄TALE-PT-DPO
@@ -94,10 +94,10 @@ python -u TALE-PT.py --eval --strategy lora --model_name <your_model> --data_pat
 
 ```sh
 # for training
-python -u TALE-PT.py --strategy dpo --model_name <your_model> --data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --strategy dpo --model_name <your_model> --train_data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 
 # for eval
-python -u TALE-PT.py --eval --strategy dpo --model_name <your_model> --data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+python -u TALE-PT.py --eval --strategy dpo --model_name <your_model> --test_data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
 ```
 
 
