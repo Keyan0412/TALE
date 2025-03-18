@@ -1,3 +1,7 @@
+"""
+GSM8K dataset module for loading and processing GSM8K math problem data.
+"""
+
 import os
 from torch.utils.data import Dataset
 import logging
@@ -7,7 +11,22 @@ logger = logging.getLogger(__name__)
 
 
 class GSM8K(Dataset):
+    """
+    Dataset class for GSM8K math problems.
+    """
+    
     def __init__(self, args, with_reasoning=True, cache=True, name=None, budget=None, split='train'):
+        """
+        Initialize the GSM8K dataset.
+        
+        Args:
+            args: Command line arguments containing configuration
+            with_reasoning (bool): Whether to include step-by-step reasoning
+            cache (bool): Whether to cache the processed data
+            name (str, optional): Name of the dataset variant
+            budget (int, optional): Token budget for prompt generation
+            split (str): Dataset split ('train' or 'test')
+        """
         from utils import create_gsm8k_prompt
         self.args = args
         self.cache = cache
@@ -21,22 +40,47 @@ class GSM8K(Dataset):
         self.dataset = sum(self.gsm8k_std_data_sets.values(), [])
 
     def _generate_configs(self):
-        config = [dict(abbr='GSM8K',
-                       path=f'./data/GSM8K',
-                       name=f'GSM8K-{self.split}',
-                       reader_cfg=dict(
-                           input_column='question',
-                           output_column='answer'
-                       ),
-                       meta_prompt=dict(
-                           round=gsm8k_prompts['reasoning'] if self.with_reasoning else gsm8k_prompts['no_reasoning'],
-                       ),
-                       )
-                  ]
+        """
+        Generate configuration for dataset loading.
+        
+        Returns:
+            list: List of configuration dictionaries containing:
+                - abbr: Dataset abbreviation
+                - path: Path to dataset files
+                - name: Dataset name
+                - reader_cfg: Input/output column configuration
+                - meta_prompt: Prompt template configuration
+        """
+        config = [{
+            'abbr': 'GSM8K',
+            'path': './data/GSM8K',
+            'name': f'GSM8K-{self.split}',
+            'reader_cfg': {
+                'input_column': 'question',
+                'output_column': 'answer'
+            },
+            'meta_prompt': {
+                'round': gsm8k_prompts['reasoning'] if self.with_reasoning else gsm8k_prompts['no_reasoning']
+            }
+        }]
         return config
 
     @staticmethod
     def _generate_std_subset(raw_data, cfg):
+        """
+        Generate standardized subset of the dataset.
+        
+        Args:
+            raw_data: Raw data from the dataset
+            cfg: Configuration dictionary
+            
+        Returns:
+            list: List of processed examples, each containing:
+                - gold: Ground truth answer
+                - reasoning_process_main: Main reasoning process
+                - reasoning_process_socratic: Socratic reasoning process
+                - round: List of conversation turns
+        """
         examples = []
         prompt_template = cfg["meta_prompt"]["round"][0]['prompt']
         for item in raw_data:
@@ -58,6 +102,19 @@ class GSM8K(Dataset):
         return examples
 
     def _generate_formal_info(self, cfg):
+        """
+        Generate formalized information from raw data files.
+        
+        Args:
+            cfg: Configuration dictionary
+            
+        Returns:
+            list: List of processed data items, each containing:
+                - question: The math problem
+                - answer: Extracted numerical answer
+                - reasoning_process_main: Main solution steps
+                - reasoning_process_socratic: Socratic solution steps
+        """
         from utils import read_jsonl
         def find_answer(text):
             pattern = r"#### (-?\d+(?:\.\d+)?|\d+/\d+)"
@@ -78,6 +135,13 @@ class GSM8K(Dataset):
         return data
 
     def _load_data(self):
+        """
+        Load and process the dataset.
+        
+        Returns:
+            dict: Dictionary mapping dataset abbreviations to processed subsets
+
+        """
         from utils import save_to_jsonl
         cfgs = self._generate_configs()
         std_data_sets = {}
@@ -91,7 +155,22 @@ class GSM8K(Dataset):
         return std_data_sets
 
     def __len__(self):
+        """
+        Get the total number of examples in the dataset.
+        
+        Returns:
+            int: Number of examples
+        """
         return len(self.dataset)
 
     def __getitem__(self, i):
+        """
+        Get a specific example from the dataset.
+        
+        Args:
+            i: Index of the example to retrieve
+            
+        Returns:
+            dict: The example at index i
+        """
         return self.dataset[i]
