@@ -65,8 +65,6 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", default=None,
                         help='The base model name.')
-    parser.add_argument("--model_path", default=None,
-                        help="The path for base model(hugging face model)")
     parser.add_argument("--lora_path", default=None, help="The path for lora model")
     parser.add_argument("--train_data_path", default=None, help="The path for loaded data")
     parser.add_argument("--test_data_path", default=None, help="The path for loaded data")
