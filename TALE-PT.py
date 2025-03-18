@@ -311,9 +311,6 @@ def train_model_with_lora(model, tokenizer, dataset):
     )
     logger.info("Lora initialized!")
     trainer.train()
-    # import sys
-    # sys.exit(-1)
-    # logger.info(type(trainer.state.log_history))
     save_to_jsonl(trainer.state.log_history, log_file)
     if args.save:
         model.save_pretrained(args.output_dir)
