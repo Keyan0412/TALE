@@ -12,31 +12,45 @@ from evaluator import AccEvaluator
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
-                    # filename='tmp/search_budget/gpt-4o-mini/log',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 def parse_args():
+    """
+    Parse command line arguments for the budget search script.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--budget", default=None, help="=The budget token for our tech.")
     parser.add_argument("--do_search", action='store_true', help="If we search the best budget.")
     parser.add_argument("--model", default='gpt-4o-mini', help="yi-lightning, gpt-4o-mini")
-    # gpt-4, gpt-4o-2024-05-13, GPT-3.5-turbo-0613, gpt-4o-mini, yi-lightning
     parser.add_argument("--output_path", default='tmp/search_budget/gpt-4o-mini',
                         help="The output path to save the model output.")
-    # ./tmp/search_budget
     parser.add_argument("--n", default=1, type=int, help="Number of samples from LLM.")
     parser.add_argument("--start_index", default=0, type=int, help="The start index for the dataset.")
     parser.add_argument("--end_index", default=700, type=int, help="The end index for the dataset.")
     parser.add_argument("--key_index", default=0, type=int, help="The key index for the dataset.")
-    # 'mathbench-college-single_choice_en'
     parser.add_argument("--data_name", default=None,
                         type=str, help="The dataset name used during our evaluation.")
     return parser.parse_args()
 
 
 def search_budget(instance, budget, model, evaluator, key='your_api_key'):
+    """
+    Search for optimal token budget that maintains prediction accuracy while minimizing tokens.
+    
+    Args:
+        instance: Dictionary containing question and ground truth
+        budget: Initial token budget (upper bound)
+        model: LLM model instance
+        evaluator: AccEvaluator instance for accuracy checking
+        key: API key for model access (default: 'your_api_key')
+        
+    Returns:
+        tuple: (updated_instance, final_budget) where:
+            updated_instance: Original instance with added budget information
+            final_budget: The optimal budget found
+    """
     pred_flag = evaluator.evaluate_sample(instance)
     upper_bound = budget
     pre_token_cost = upper_bound
@@ -57,8 +71,7 @@ def search_budget(instance, budget, model, evaluator, key='your_api_key'):
         })
         # condition for the next iteration
         if pred_flag and cur_token_cost < pre_token_cost:
-        # if pred_flag and budget > 1:
-            # update current best answer and budge
+            # update current best answer and budget
             logger.info(f'Searching budget from {budget} to {budget // 2}.')
             logger.info(f'Token costs from {pre_token_cost} to {cur_token_cost}')
             instance['question_budget'] = new_question
@@ -67,7 +80,6 @@ def search_budget(instance, budget, model, evaluator, key='your_api_key'):
             budget //= 2
             pre_token_cost = cur_token_cost
             res_budget_list.append(budget)
-            # save_to_jsonl([instance], f'temp/format-0-700/yi-lightning/with_reasoning/log-{budget}.jsonl')
         else:
             break
     instance['budget_list'] = res_budget_list
@@ -76,6 +88,7 @@ def search_budget(instance, budget, model, evaluator, key='your_api_key'):
 
 
 def main():
+
     args = parse_args()
     args.do_search = True
     args.output_path = os.path.join(args.output_path, 'searcged_budget.jsonl')
@@ -95,7 +108,6 @@ def main():
     else:
         dataset = None
         ValueError(f"Not supported for {args.data_name}")
-    # dataset = read_jsonl(f'tmp/search_budget/gpt-4o-mini/raw_data.jsonl')
     model = LLMModel(args)
     keys = {
         'yi-lightning': ['your_api_key', 'your_api_key'],
@@ -117,8 +129,6 @@ def main():
                     continue
                 target_pred = instance['prediction']
                 budget_upper_bound = token_measure(target_pred)
-                # new_instance, budget = search_budget(instance, budget_upper_bound,
-                #                                      model, evaluator, key=keys[args.key_index])
                 new_instance, budget = search_budget(instance, budget_upper_bound,
                                                      model, evaluator, key=key)
                 logger.info("Updating Budget: {}/{}.".format(budget, budget_upper_bound))
@@ -127,7 +137,6 @@ def main():
                 res_budget.append(new_instance)
                 save_to_jsonl(res_budget, args.output_path)
     else:
-        # With an initialized budget but not the optimal searched budget
         evaluator = AccEvaluator(dataset)
         for idx, instance in enumerate(dataset):
             if (idx + 1) >= 1:

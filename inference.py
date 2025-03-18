@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 
 
 def prepare_data(args):
+    """
+    Prepare dataset based on command line arguments.
+    
+    Args:
+        args: Command line arguments containing:
+            data_name: Name of the dataset to load
+            reasoning: Whether to include reasoning
+            budget: Token budget for responses
+            
+    Returns:
+        Dataset object of the specified type or None if data_name is not supported
+    """
     if 'math' in args.data_name:
         if args.data_name == 'math':
             dataset = MathBenchDataset(args, with_reasoning=args.reasoning, budget=args.budget, cache=False)
@@ -40,6 +52,17 @@ def prepare_data(args):
 
 
 def data2list(dataset):
+    """
+    Convert dataset instances to lists of samples and ground truths.
+    
+    Args:
+        dataset: The dataset to convert
+        
+    Returns:
+        tuple: (sample_list, gt_list) where:
+            sample_list: List of prompt strings
+            gt_list: List of ground truth answers
+    """
     sample_list = []
     gt_list = []
     for idx, instance in enumerate(dataset):
@@ -50,8 +73,18 @@ def data2list(dataset):
     return sample_list, gt_list
 
 
-# accelerate for huggingface model
 def inference_local(args, dataset, model, evaluator):
+    """
+    Run inference using a local model (e.g. Hugging Face models).
+    
+    Args:
+        args: Command line arguments
+        dataset: Dataset to run inference on
+        model: The local LLM model instance
+        evaluator: AccEvaluator instance for accuracy calculation
+        
+    Results include accuracy percentage and average token cost per sample.
+    """
     acc_num = 0
     token_num = 0
     results = []
@@ -76,13 +109,21 @@ def inference_local(args, dataset, model, evaluator):
         token_num += token_measure(pred_list[i])
     logger.info(f'Accuracy: {100 * acc_num / len(results):.2f}%')
     logger.info(f'Token costs: {token_num / len(results):.2f}')
-    # logger.info(f"Ground truth: {ground_truth}")
-    # logger.info(f"Prediction: {pred[0][0]}")
     save_to_jsonl(results, args.output_path)
     logger.info(f'Time cost: {time.time() - start_time}')
 
 
 def inference_api(args, dataset, model, evaluator, key):
+    """
+    Run inference using an API-based model (e.g. GPT-4, Claude).
+    
+    Args:
+        args: Command line arguments
+        dataset: Dataset to run inference on
+        model: The API-based LLM model instance
+        evaluator: AccEvaluator instance for accuracy calculation
+        key: API key for model access
+    """
     acc_num = 0
     results = []
     start_time = time.time()
@@ -114,20 +155,20 @@ def inference_api(args, dataset, model, evaluator, key):
 
 
 def parse_args():
+    """
+    Parse command line arguments for the inference script.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", default=64, type=int, help="=The budget token for our tech.")
     parser.add_argument("--budget", default=None, help="=The budget token for our tech.")
     parser.add_argument("--reasoning", action='store_true', help="If we use LLM reasoning.")
     parser.add_argument("--model", default='DeepSeek-R1-Distill-Qwen-1.5B', help="The model name on huggingface.")
-    # gpt-4, gpt-4o-2024-05-13, GPT-3.5-turbo-0613, gpt-4o-mini, yi-lightning,
-    # Qwen2.5-7B-Instruct, Llama-3.1-8B-Instruct
     parser.add_argument("--output_path", default='./tmp',
                         help="The output path to save the model output.")
     parser.add_argument("--n", default=1, type=int, help="Number of samples from LLM.")
     parser.add_argument("--start_index", default=0, type=int, help="The start index for the dataset.")
     parser.add_argument("--end_index", default=None, type=int, help="The end index for the dataset.")
     parser.add_argument("--key_index", default=1, type=int, help="The key index for the dataset.")
-    # 'mathbench-college-single_choice_en, GSM8K, GPQA, GSM8K-Zero'
     parser.add_argument("--data_name", default='GSM8K-Zero',
                         type=str, help="The dataset name used during our evaluation.")
     return parser.parse_args()
@@ -143,7 +184,7 @@ def main():
                                     'output_with_reasoning.jsonl'
                                     if args.reasoning else 'output_without_reasoning_new_prompt.jsonl')
     logger.info(f'Saving to {args.output_path}')
-    args.local = (args.model in ['Llama-3.1-8B-Instruct']) or 'Qwen' in args.model  # 是否使用 batch size
+    args.local = (args.model in ['Llama-3.1-8B-Instruct']) or 'Qwen' in args.model  
     keys = {
         'yi-lightning': ['your_api_key', 'your_api_key'],
         'gpt-4o-mini': ['your_api_key', 'your_api_key'],

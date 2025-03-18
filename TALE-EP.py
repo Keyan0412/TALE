@@ -17,26 +17,34 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message
 logger = logging.getLogger(__name__)
 
 
-# TODO: add more number of generated responses?
-
 def parse_args():
+    """
+    Parse command line arguments for the TALE-EP script.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--reasoning", action='store_true', help="If we use LLM reasoning.")
     parser.add_argument("--model", default='gpt-4o-mini', help="The model name on huggingface.")
-    # gpt-4, gpt-4o-2024-05-13, GPT-3.5-turbo-0613, gpt-4o-mini, yi-lightning
     parser.add_argument("--output_path", default='./temp/100-test',
                         help="The output path to save the model output.")
     parser.add_argument("--n", default=1, type=int, help="Number of samples from LLM.")
     parser.add_argument("--start_index", default=0, type=int, help="The start index for the dataset.")
     parser.add_argument("--end_index", default=100, type=int, help="The end index for the dataset.")
     parser.add_argument("--key_index", default=2, type=int, help="The key index for the dataset.")
-    # 'mathbench-college-single_choice_en, GSM8K, GSM8K-Zero, '
     parser.add_argument("--data_name", default='GSM8K',
                         type=str, help="The dataset name used during our evaluation.")
     return parser.parse_args()
 
 
 def Adapter(dataset, model, key, args):
+    """
+    Adapts the dataset for evaluation using the specified model and parameters.
+    
+    Args:
+        dataset: The input dataset to process
+        model: The LLM model instance to use for queries
+        key: API key for model access
+        args: Command line arguments containing configuration parameters
+    """
     evaluator = AccEvaluator()
     zero_shot_context = create_zero_shot_context()
     budget_pred_prompt = PromptTemplate(
@@ -63,11 +71,8 @@ def Adapter(dataset, model, key, args):
                 context=zero_shot_context,
                 question=item['question']
             )
-            # logger.info(f"Extract question: {item['question']}")
-            # logger.info(format_prompt)
             answer, _, _ = model.query([{'prompt': format_prompt}], key=key)
             budget_pred = int(extract_number(answer[0]))
-            # budget_pred = item2['budget_reasoning']
             new_question = add_budget(dataset[index]['round'][0]['prompt'], budget_pred)
             logger.info(new_question)
             new_answer, _, _ = model.query([{'prompt': new_question}], key=key)
@@ -88,6 +93,9 @@ def Adapter(dataset, model, key, args):
 
 
 def main():
+    """
+    Main entry point for the TALE-EP script.
+    """
     args = parse_args()
     args.reasoning = True
     args.output_path = os.path.join(args.output_path, args.model, args.data_name)
@@ -117,7 +125,7 @@ def main():
     else:
         dataset = None
         ValueError(f"{args.data_name} is not supported!")
-    # dataset = Subset(dataset, list(range(1500, 2000)))
+
     # Prepare llm model
     model = LLMModel(args)
     Adapter(dataset, model, key, args)

@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 
 def search_budget(instance, budget, model, evaluator, key='your_api_key'):
+    """
+    Search for optimal token budget while tracking budget and token usage progression.
+    
+    Args:
+        instance: Dictionary containing question and ground truth
+        budget: Initial token budget (upper bound)
+        model: LLM model instance
+        evaluator: AccEvaluator instance for accuracy checking
+        key: API key for model access (default: 'your_api_key')
+        
+    Returns:
+        tuple: (updated_instance, final_budget, budget_list, token_list) where:
+            updated_instance: Original instance with added budget information
+            final_budget: The optimal budget found
+            budget_list: List of all budget values tried during search
+            token_list: List of actual token usage for each budget tried
+    """
     pred_flag = evaluator.evaluate_sample(instance)
     upper_bound = budget
     pre_token_cost = upper_bound
@@ -48,26 +65,35 @@ def search_budget(instance, budget, model, evaluator, key='your_api_key'):
             pre_token_cost = cur_token_cost
             budget_list.append(budget)
             token_list.append(cur_token_cost)
-            # save_to_jsonl([instance], f'temp/format-0-700/yi-lightning/with_reasoning/log-{budget}.jsonl')
         else:
             break
-    # instance['budget'] = budget
     return instance, budget, budget_list, token_list
 
 
 def main():
+    """
+    Main entry point for the token elasticity analysis script.
+    
+    This function:
+    1. Parses command line arguments for configuration
+    2. Sets up output paths and logging
+    3. Loads dataset from raw data file
+    4. Initializes model and evaluator
+    5. For each valid instance:
+       - Determines initial budget from original prediction
+       - Searches for optimal budget while tracking elasticity
+       - Saves progression of budget and token usage.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--budget", default=None, help="=The budget token for our tech.")
     parser.add_argument("--do_search", action='store_true', help="If we search the best budget.")
     parser.add_argument("--model", default='yi-lightning', help="yi-lightning, gpt-4o-mini. gpt-4o")
-    # gpt-4, gpt-4o-2024-05-13, GPT-3.5-turbo-0613, gpt-4o-mini, yi-lightning
     parser.add_argument("--output_path", default='./tmp/search_budget',
                         help="The output path to save the model output.")
     parser.add_argument("--n", default=1, type=int, help="Number of samples from LLM.")
     parser.add_argument("--start_index", default=0, type=int, help="The start index for the dataset.")
     parser.add_argument("--end_index", default=700, type=int, help="The end index for the dataset.")
     parser.add_argument("--key_index", default=0, type=int, help="The key index for the dataset.")
-    # 'mathbench-college-single_choice_en'
     parser.add_argument("--data_name", default=None,
                         type=str, help="The dataset name used during our evaluation.")
     args = parser.parse_args()
