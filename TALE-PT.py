@@ -228,6 +228,8 @@ def prepare_dpo_train_data():
 def evaluate():
     """
     Evaluate model performance on test data.
+    Returns:
+        list: List of evaluation metrics
     """
     def AvgLength(sample_list, gt_list):
         logger.info(f"Data size: {len(sample_list)}")
