@@ -26,6 +26,9 @@ python -u inference.py --data_name GSM8K-Test --model gpt-4o-mini
 
 # for local model on GSM8K-Test
 python -u inference.py --model <local_model_name> --data_name GSM8K-Test --output_path <your_outdir> --batch_size 256
+
+# example
+python -u inference.py --model Llama-3.1-8B-Instruct --data_name GSM8K-Test --output_path results --batch_size 256
 ```
 
 ### 🔗Vanilla CoT
@@ -36,6 +39,9 @@ python -u inference.py --data_name GSM8K-Test --model gpt-4o-mini --reasoning
 
 # for local model on GSM8K-Test
 python -u inference.py --model <local_model_name> --data_name GSM8K-Test --output_path <your_outdir> --batch_size 256 --reasoning
+
+# example
+python -u inference.py --model Llama-3.1-8B-Instruct --data_name GSM8K-Test --output_path results --batch_size 256 --reasoning
 ```
 
 
@@ -83,9 +89,13 @@ python -u TALE-EP.py --data_name GSM8K-Test --model gpt-4o-mini
 ```sh
 # for training
 python -u TALE-PT.py --strategy lora --model_name <your_model> --train_data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+# example
+python -u TALE-PT.py --strategy lora --model_name Llama-3.1-8B-Instruct --train_data_path training.jsonl --output_dir results --batch_size 2 --save
 
 # for eval
 python -u TALE-PT.py --eval --strategy lora --model_name <your_model> --test_data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+# example
+python -u TALE-PT.py --eval --strategy lora --model_name Llama-3.1-8B-Instruct --test_data_path test.jsonl --output_dir results --batch_size 2 --save
 ```
 
 #### 🔄TALE-PT-DPO
@@ -95,9 +105,13 @@ python -u TALE-PT.py --eval --strategy lora --model_name <your_model> --test_dat
 ```sh
 # for training
 python -u TALE-PT.py --strategy dpo --model_name <your_model> --train_data_path <your_training_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+# example
+python -u TALE-PT.py --strategy dpo --model_name Llama-3.1-8B-Instruct --train_data_path training.jsonl --output_dir results --batch_size 2 --save
 
 # for eval
 python -u TALE-PT.py --eval --strategy dpo --model_name <your_model> --test_data_path <your_eval_data_path> --output_dir <your_output_dir> --batch_size 2 --save
+# example
+python -u TALE-PT.py --eval --strategy dpo --model_name Llama-3.1-8B-Instruct --test_data_path test.jsonl --output_dir results --batch_size 2 --save
 ```
 
 
