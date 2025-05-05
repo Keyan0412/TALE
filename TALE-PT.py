@@ -181,7 +181,7 @@ def prepare_sft_train_data():
         "target_text": prediction_budget
     }
     """
-    data = read_jsonl(args.tradata_path)
+    data = read_jsonl(args.train_data_path)
     cleaned_data = [{
         "question": item['question'],
         "prediction": item['prediction_budget']  
