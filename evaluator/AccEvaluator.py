@@ -1,6 +1,5 @@
 import logging
 import re
-from math_verify import parse, verify
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +121,7 @@ class AccEvaluator:
         gt = sample['ground truth']
         pred = sample['prediction']
         if cloze:
-            return (gt == self.extract_predicted_answer(pred)) or (f"[[{gt}]]" in pred) \
-                   or verify(parse(gt), parse(self.extract_predicted_answer(pred)))
+            return (gt == self.extract_predicted_answer(pred)) or (f"[[{gt}]]" in pred)
         else:
             if f'[[{gt}]]' in pred:
                 return True

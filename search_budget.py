@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import os
-import random
 import argparse
 from utils import *
-from torch.utils.data import Subset
 from llm_datasets import *
 from llm_models import LLMModel
-import time
 import logging
 from evaluator import AccEvaluator
+from settings import OPENAI_API_KEY
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
@@ -28,9 +29,9 @@ def parse_args():
                         help="The output path to save the model output.")
     parser.add_argument("--n", default=1, type=int, help="Number of samples from LLM.")
     parser.add_argument("--start_index", default=0, type=int, help="The start index for the dataset.")
-    parser.add_argument("--end_index", default=700, type=int, help="The end index for the dataset.")
+    parser.add_argument("--end_index", default=None, type=int, help="The end index for the dataset.")
     parser.add_argument("--key_index", default=0, type=int, help="The key index for the dataset.")
-    parser.add_argument("--data_name", default=None,
+    parser.add_argument("--data_name", default='GSM8K',
                         type=str, help="The dataset name used during our evaluation.")
     return parser.parse_args()
 
@@ -52,6 +53,9 @@ def search_budget(instance, budget, model, evaluator, key='your_api_key'):
             final_budget: The optimal budget found
     """
     pred_flag = evaluator.evaluate_sample(instance)
+    if not pred_flag:
+        logger.info("Incorrect prediction, skipping...")
+        return instance, budget
     upper_bound = budget
     pre_token_cost = upper_bound
     instance['question_budget'] = 'None'
@@ -82,86 +86,101 @@ def search_budget(instance, budget, model, evaluator, key='your_api_key'):
             res_budget_list.append(budget)
         else:
             break
+    if not pred_flag:
+        logger.info("Incorrect prediction, ending search...")
+    if cur_token_cost > pre_token_cost:
+        logger.info("Token cost increased, ending search...")
     instance['budget_list'] = res_budget_list
     instance['token_list'] = res_token_list
     return instance, budget
 
 
 def main():
-
     args = parse_args()
     args.do_search = True
-    args.output_path = os.path.join(args.output_path, 'searcged_budget.jsonl')
+    args.output_path = os.path.join(args.output_path, 'searched_budget.jsonl')
     logger.info(f'Saving to {args.output_path}')
-    if 'math' in args.data_name:
-        if args.data_name == 'math':
-            dataset = MathBenchDataset(args, with_reasoning=args.reasoning, budget=args.budget, cache=False)
-        else:
-            dataset = MathBenchDataset(args, with_reasoning=args.reasoning, budget=args.budget,
-                                       name=args.data_name, cache=False)
-    elif args.data_name == 'GSM8K-Zero':
-        dataset = GSM8KZero(args, with_reasoning=args.reasoning, budget=args.budget,
-                            name=args.data_name, cache=False)
-    elif args.data_name == 'GSM8K':
-        dataset = GSM8K(args, with_reasoning=args.reasoning, budget=args.budget,
-                        name=args.data_name, cache=False)
-    else:
-        dataset = None
-        ValueError(f"Not supported for {args.data_name}")
+    
+    dataset = read_jsonl("./tmp/gpt-4o-mini/GSM8K-Test/output_with_reasoning_nb.jsonl")
     model = LLMModel(args)
     keys = {
-        'yi-lightning': ['your_api_key', 'your_api_key'],
-        'gpt-4o-mini': ['your_api_key', 'your_api_key'],
-        'gpt-4o-2024-05-13': ['your_api_key', 'your_api_key'],
+        'yi-lightning': [OPENAI_API_KEY],
+        'gpt-4o-mini': [OPENAI_API_KEY],
+        'gpt-4o-2024-05-13': [OPENAI_API_KEY],
     }
     key = keys[args.model][args.key_index]
     res_budget = []
-    logger.info("=" * 30 + 'Searching' + "=" * 30 + '\n')
+    logger.info("start searching budget...")
     if args.end_index is None:
         args.end_index = len(dataset)
+
+    # search for the best budget
+    evaluator = AccEvaluator(dataset)
+    idx = args.start_index
     if args.do_search:
-        evaluator = AccEvaluator(dataset)
-        for idx, instance in enumerate(dataset):
-            if args.start_index <= idx < args.end_index:
-                logger.info('=' * 30 + f"Step: {idx + 1} / {len(dataset)}" + '=' * 30)
-                pred_flag = evaluator.evaluate_sample(instance)
-                if not pred_flag:
-                    continue
-                target_pred = instance['prediction']
-                budget_upper_bound = token_measure(target_pred)
-                new_instance, budget = search_budget(instance, budget_upper_bound,
-                                                     model, evaluator, key=key)
-                logger.info("Updating Budget: {}/{}.".format(budget, budget_upper_bound))
-                logger.info("Updating Token costs: {}/{}."
-                            .format(token_measure(new_instance['prediction_budget']), budget_upper_bound))
+        def search_process_instance(instance, model, evaluator, key):
+            nonlocal res_budget
+            token_cost = token_measure(instance['prediction'])
+            new_instance, budget = search_budget(instance, token_cost, model, evaluator, key=key)
+            new_token_cost = token_measure(new_instance['prediction_budget'])
+            logger.info(f"Updating Budget: {budget}.")
+            logger.info(f"Updating Token costs: {token_cost} ==> {new_token_cost}.")
+            with threading.Lock():
                 res_budget.append(new_instance)
-                save_to_jsonl(res_budget, args.output_path)
-    else:
-        evaluator = AccEvaluator(dataset)
-        for idx, instance in enumerate(dataset):
-            if (idx + 1) >= 1:
-                logger.info('=' * 30 + f"Step: {idx + 1} / {len(dataset)}" + '=' * 30)
-                pred_flag = evaluator.evaluate_sample(instance)
-                if not pred_flag:
+
+        with ThreadPoolExecutor(max_workers=32) as executor:
+            futures = []
+            while idx < args.end_index:
+                instance = dataset[idx]
+                logger.info('=' * 30 + f"Step: {idx - args.start_index + 1} / {args.end_index-args.start_index}" + '=' * 30)
+
+                # check correctness of prediction
+                if not evaluator.evaluate_sample(instance): 
+                    logger.info("Incorrect prediction, skipping...")
+                    idx += 1
                     continue
-                target_pred = instance['prediction']
-                budget_upper_bound = token_measure(target_pred)
-                new_question = add_budget(instance['question'], budget_upper_bound // 2)
-                cur_sample = [{'prompt': new_question}]
-                cur_answer = model.query(cur_sample, key=key)[0][0]
-                cur_token_cost = token_measure(cur_answer)
-                pred_flag = evaluator.evaluate_sample({
-                    'ground truth': instance['ground truth'],
-                    'prediction': cur_answer
-                })
-                if pred_flag:
-                    instance['question_budget'] = new_question
-                    instance['prediction_budget'] = cur_answer
-                    instance['budget'] = budget_upper_bound // 2
-                    logger.info("Updating Token costs: {}/{}."
-                                .format(cur_token_cost, budget_upper_bound))
-                    res_budget.append(instance)
-                    save_to_jsonl(res_budget, args.output_path)
+
+                future = executor.submit(search_process_instance, instance, model, evaluator, key)
+                futures.append(future)
+                idx += 1
+
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as exc:
+                    logger.error(f"处理实例时发生错误: {exc}")
+            save_to_jsonl(res_budget, args.output_path)
+
+    # simply reduce the token cost by half
+    else:  
+        while idx < args.end_index:
+            instance = dataset[idx]
+            logger.info('=' * 30 + f"Step: {idx - args.start_index + 1} / {args.end_index-args.start_index}" + '=' * 30)
+
+            # check correctness of prediction
+            if not evaluator.evaluate_sample(instance): 
+                logger.info("Incorrect prediction, skipping...")
+                idx += 1
+                continue
+
+            token_cost = token_measure(instance['prediction'])
+            new_question = add_budget(instance['question'], token_cost // 2)  # add budget to the question
+            cur_sample = [{'prompt': new_question}]
+            cur_answer = model.query(cur_sample, key=key)[0][0]
+            cur_token_cost = token_measure(cur_answer)
+
+            # check prediction and record the instance
+            if evaluator.evaluate_sample({
+                'ground truth': instance['ground truth'],
+                'prediction': cur_answer
+            }):
+                instance['question_budget'] = new_question
+                instance['prediction_budget'] = cur_answer
+                instance['budget'] = token_cost // 2
+                logger.info("Updating Token costs: {}/{}.".format(cur_token_cost, token_cost))
+                res_budget.append(instance)
+            idx += 1
+        save_to_jsonl(res_budget, args.output_path)
 
 
 if __name__ == "__main__":

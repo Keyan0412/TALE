@@ -6,7 +6,9 @@ from llm_models import LLMModel
 import time
 import logging
 from evaluator import AccEvaluator
-
+from settings import OPENAI_API_KEY
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
@@ -130,28 +132,47 @@ def inference_api(args, dataset, model, evaluator, key):
     logger.info("=" * 30 + 'Requesting' + "=" * 30 + '\n')
     if args.end_index is None:
         args.end_index = len(dataset)
-    for idx, instance in enumerate(dataset):
-        # logger.info(idx)
-        if args.start_index <= idx < args.end_index:
-            cur_sample = instance['round']
-            ground_truth = instance['gold']
-            logger.info('=' * 30 + f"Step: {idx + 1} / {args.end_index}" + '=' * 30)
-            # pred = model.query(cur_sample, key=keys[args.key_index])
-            logger.info(f"Question: {cur_sample[0]['prompt']}")
-            pred = model.query(cur_sample, key=key)
-            results.append({
-                "ground truth": ground_truth,
-                "question": cur_sample[0]['prompt'],
-                "prediction": pred[0][0],
-            })
-            acc_num += evaluator.evaluate_sample(results[-1],
-                                                 cloze=('cloze' in args.data_name) or (
-                                                         args.data_name in ['GSM8K', 'GSM8K-Zero']))
+
+    def process_instance(args, instance, idx, key, evaluator, start_time):
+        """
+        Process a single instance.
+        """
+        nonlocal acc_num
+        cur_sample = instance['round']
+        ground_truth = instance['gold']
+        logger.info('=' * 30 + f"Step: {idx + 1} / {args.end_index}" + '=' * 30)
+        logger.info(f"Question: {cur_sample[0]['prompt']}")
+
+        pred = model.query(cur_sample, key=key)
+        result = {
+            "ground truth": ground_truth,
+            "question": cur_sample[0]['prompt'],
+            "prediction": pred[0][0],
+        }
+
+        with threading.Lock():
+            results.append(result)
+            acc_num += evaluator.evaluate_sample(result,
+                                                cloze=('cloze' in args.data_name) or (
+                                                        args.data_name in ['GSM8K', 'GSM8K-Zero']))
             logger.info(f'Accuracy: {acc_num / len(results)}')
-            # logger.info(f"Ground truth: {ground_truth}")
-            # logger.info(f"Prediction: {pred[0][0]}")
             save_to_jsonl(results, args.output_path)
             logger.info(f'Time cost: {time.time() - start_time}')
+
+        return result
+    
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        futures = []
+        for idx, instance in enumerate(dataset):
+            if args.start_index <= idx < args.end_index:
+                future = executor.submit(process_instance, args, instance, idx, key, evaluator, start_time)
+                futures.append(future)
+
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                logger.error(f"Error when processing instance: {exc}")
 
 
 def parse_args():
@@ -168,7 +189,7 @@ def parse_args():
     parser.add_argument("--n", default=1, type=int, help="Number of samples from LLM.")
     parser.add_argument("--start_index", default=0, type=int, help="The start index for the dataset.")
     parser.add_argument("--end_index", default=None, type=int, help="The end index for the dataset.")
-    parser.add_argument("--key_index", default=1, type=int, help="The key index for the dataset.")
+    parser.add_argument("--key_index", default=0, type=int, help="The key index for the dataset.")
     parser.add_argument("--data_name", default='GSM8K-Zero',
                         type=str, help="The dataset name used during our evaluation.")
     return parser.parse_args()
@@ -187,8 +208,8 @@ def main():
     args.local = (args.model in ['Llama-3.1-8B-Instruct']) or 'Qwen' in args.model  
     keys = {
         'yi-lightning': ['your_api_key', 'your_api_key'],
-        'gpt-4o-mini': ['your_api_key', 'your_api_key'],
-        'gpt-4o-2024-05-13': ['your_api_key', 'your_api_key'],
+        'gpt-4o-mini': [OPENAI_API_KEY, 'your_api_key'],
+        'gpt-4o-2024-05-13': [OPENAI_API_KEY, 'your_api_key'],
     }
     key = keys[args.model][args.key_index] if not args.local else None
 

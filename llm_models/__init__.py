@@ -1,9 +1,7 @@
 from openai import OpenAI
-from google.api_core import retry
 import time
 import torch
 import requests
-import google.generativeai as palm
 from tqdm import tqdm
 from utils import *
 import random

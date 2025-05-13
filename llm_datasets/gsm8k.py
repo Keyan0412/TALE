@@ -145,12 +145,18 @@ class GSM8K(Dataset):
         from utils import save_to_jsonl
         cfgs = self._generate_configs()
         std_data_sets = {}
+
+        type = 'reasoning' if self.with_reasoning else 'no_reasoning'
+        if os.path.exists(os.path.join('./.cache', cfgs[0]["abbr"]) + f'-{self.split}' +  f'{type}.jsonl'):
+            print("test data cache hit")
+            std_data_sets[cfgs[0]["abbr"]] = read_jsonl(os.path.join('./.cache', 'GSM8K-train.jsonl'))
+            return std_data_sets
+        
         for cfg in cfgs:
             # [{question, answer, reasoning_process_main, reasoning_process_socratic}]
             info = self._generate_formal_info(cfg)
             std_subset = self._generate_std_subset(info, cfg)
-            save_to_jsonl(std_subset, os.path.join('./.cache', cfg["abbr"]) + f'-{self.split}.jsonl')
-            # print(f"the path is {os.path.join('./.cache', cfg['abbr']) + f'-{self.split}.jsonl'}")
+            save_to_jsonl(std_subset, os.path.join('./.cache', cfg["abbr"]) + f'-{self.split}' +  f'{type}.jsonl')
             std_data_sets[cfg["abbr"]] = std_subset
         return std_data_sets
 

@@ -6,6 +6,7 @@ for handling questions, managing tokens, and file operations.
 """
 
 import json
+import os
 import re
 from .prompt_template import *
 import tiktoken
@@ -159,6 +160,7 @@ def save_to_jsonl(data, file_path):
         data: List of objects to save as JSON lines
         file_path: Target file path
     """
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as file:
         for item in data:
             json_line = json.dumps(item, ensure_ascii=False)
